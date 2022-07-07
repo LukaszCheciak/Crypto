@@ -1,4 +1,3 @@
-# This app is for educational purpose only. Insights gained is not financial advice. Use at your own risk!
 import streamlit as st
 from PIL import Image
 import pandas as pd
@@ -8,17 +7,12 @@ from bs4 import BeautifulSoup
 import requests
 import json
 import time
-import ast
-#---------------------------------#
-# New feature (make sure to upgrade your streamlit library)
-# pip install --upgrade streamlit
 
-#---------------------------------#
-# Page layout
-## Page expands to full width
+# Układ strony
+# Rozwijanie strony do pełnej szerokości
 st.set_page_config(layout="wide")
-#---------------------------------#
-# Title
+
+# Tytuł strony (jako logo w .jpg)
 
 image = Image.open('logo.jpg')
 
@@ -26,33 +20,30 @@ st.image(image, width = 500)
 
 st.title('Crypto Price App')
 st.markdown("""
-This app retrieves cryptocurrency prices for the top 100 cryptocurrency from the **CoinMarketCap**!
+Ta aplikacja pobiera dane o 100 najpopularniejszych cryptowalutach ze strony coinmarketcap
 
 """)
-#---------------------------------#
-# About
-expander_bar = st.expander("About")
+
+# O stronie
+expander_bar = st.expander("O stronie")
 expander_bar.markdown("""
-* **Python libraries:** base64, pandas, streamlit, numpy, matplotlib, seaborn, BeautifulSoup, requests, json, time
-* **Data source:** [CoinMarketCap](http://coinmarketcap.com).
-* **Credit:** Web scraper adapted from the Medium article *[Web Scraping Crypto Prices With Python](https://towardsdatascience.com/web-scraping-crypto-prices-with-python-41072ea5b5bf)* written by [Bryan Feng](https://medium.com/@bryanf).
+* **Użyte biblioteki:** base64, pandas, streamlit, numpy, matplotlib, seaborn, BeautifulSoup, requests, json, time
+* **Źródło danych:** [CoinMarketCap](http://coinmarketcap.com).
 """)
 
 
-#---------------------------------#
-# Page layout (continued)
-## Divide page to 3 columns (col1 = sidebar, col2 and col3 = page contents)
+# dalszy układ strony
+#podzielenie strony na 3 kolumny co1 = panel boczny, col2 i col3 = panel główny 
 col1 = st.sidebar
 col2, col3 = st.columns((2,1))
 
-#---------------------------------#
-# Sidebar + Main panel
-col1.header('Input Options')
+# łązenie panelu bocznego z głównym
+col1.header('Wybieranie waluty')
 
-## Sidebar - Currency price unit
-currency_price_unit = col1.selectbox('Select currency for price', ('USD', 'BTC', 'ETH'))
+# wybór waluty w panelu bocznym
+currency_price_unit = col1.selectbox('Wybierz walute', ('USD', 'BTC', 'ETH'))
 
-# Web scraping of CoinMarketCap data
+# Web sraper do pobierania potrzebnych danych ze strony w json 
 @st.cache
 def load_data():
     cmc = requests.get('https://coinmarketcap.com')
@@ -60,8 +51,9 @@ def load_data():
 
     data = soup.find('script', id='__NEXT_DATA__', type='application/json')
     coins = {}
-    coin_data = json.loads(data.contents[1])
-    listings = coin_data['props']['initialState']['cryptocurrency']['listingLatest']['data']
+    coin_data = json.loads(data.contents[0])
+    bebe = json.loads(coin_data['props']['initialState'])
+    listings = bebe['cryptocurrency']['listingLatest']['data'][0].values()
     for i in listings:
       coins[str(i['id'])] = i['slug']
 
@@ -98,42 +90,42 @@ def load_data():
 
 df = load_data()
 
-## Sidebar - Cryptocurrency selections
+## wybór kryptowaluty na panelu bocznym 
 sorted_coin = sorted( df['coin_symbol'] )
-selected_coin = col1.multiselect('Cryptocurrency', sorted_coin, sorted_coin)
+selected_coin = col1.multiselect('Kryptowaluta', sorted_coin, sorted_coin)
 
-df_selected_coin = df[ (df['coin_symbol'].isin(selected_coin)) ] # Filtering data
+# filtrowanie danych
+df_selected_coin = df[ (df['symbol waluty'].isin(selected_coin)) ] 
 
-## Sidebar - Number of coins to display
-num_coin = col1.slider('Display Top N Coins', 1, 100, 100)
+# wybór ilości kryptowalut na panelu bocznym (1, 10 albo 100)
+num_coin = col1.slider('wyświetl N najpopularniejszych walut', 1, 100, 100)
 df_coins = df_selected_coin[:num_coin]
 
-## Sidebar - Percent change timeframe
-percent_timeframe = col1.selectbox('Percent change time frame',
+# procentowa zmiana wartości na przestrzenii wybranego czasu na panelu bocznym
+percent_timeframe = col1.selectbox('procentowa zmiana waritości przez',
                                     ['7d','24h', '1h'])
 percent_dict = {"7d":'percent_change_7d',"24h":'percent_change_24h',"1h":'percent_change_1h'}
 selected_percent_timeframe = percent_dict[percent_timeframe]
 
-## Sidebar - Sorting values
+# sortowanie w panelu bocznym
 sort_values = col1.selectbox('Sort values?', ['Yes', 'No'])
 
-col2.subheader('Price Data of Selected Cryptocurrency')
-col2.write('Data Dimension: ' + str(df_selected_coin.shape[0]) + ' rows and ' + str(df_selected_coin.shape[1]) + ' columns.')
+col2.subheader('Dane cenowe wybranej kryptowaluty')
+col2.write('Wymiar danych: ' + str(df_selected_coin.shape[0]) + ' wierszy i ' + str(df_selected_coin.shape[1]) + ' kolumn.')
 
 col2.dataframe(df_coins)
 
-# Download CSV data
-# https://discuss.streamlit.io/t/how-to-download-file-in-streamlit/1806
+# pobieranie danych  CSV
+
 def filedownload(df):
     csv = df.to_csv(index=False)
-    b64 = base64.b64encode(csv.encode()).decode()  # strings <-> bytes conversions
+    b64 = base64.b64encode(csv.encode()).decode()
     href = f'<a href="data:file/csv;base64,{b64}" download="crypto.csv">Download CSV File</a>'
     return href
 
 col2.markdown(filedownload(df_selected_coin), unsafe_allow_html=True)
 
-#---------------------------------#
-# Preparing data for Bar plot of % Price change
+# Przygotowanie danych do stworzenia wykresu słupkowego % zmiany ceny
 col2.subheader('Table of % Price Change')
 df_change = pd.concat([df_coins.coin_symbol, df_coins.percent_change_1h, df_coins.percent_change_24h, df_coins.percent_change_7d], axis=1)
 df_change = df_change.set_index('coin_symbol')
@@ -142,8 +134,8 @@ df_change['positive_percent_change_24h'] = df_change['percent_change_24h'] > 0
 df_change['positive_percent_change_7d'] = df_change['percent_change_7d'] > 0
 col2.dataframe(df_change)
 
-# Conditional creation of Bar plot (time frame)
-col3.subheader('Bar plot of % Price Change')
+# Warunkowe tworzenie wykresu słupkowego (przedział czasowy)
+col3.subheader('Warunkowe tworzenie wykresu słupkowego (przedział czasowy)')
 
 if percent_timeframe == '7d':
     if sort_values == 'Yes':
